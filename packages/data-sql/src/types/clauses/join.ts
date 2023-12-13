@@ -9,6 +9,7 @@ export interface AbstractSqlQueryJoinNode {
 
 	/* the foreign table to join */
 	table: string;
+	tableIndex: number;
 
 	/*
 	 * the condition used to specify the relation between the two tables.
@@ -17,7 +18,4 @@ export interface AbstractSqlQueryJoinNode {
 	 * We reuse the filter logic to specify the join condition, and by that enable the user to specify all kinds of join conditions.
 	 */
 	on: AbstractSqlQueryConditionNode | AbstractSqlQueryLogicalNode;
-
-	/* the generated alias which will be part of the actual query */
-	as: string;
 }

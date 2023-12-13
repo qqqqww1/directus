@@ -1,6 +1,6 @@
 export interface AbstractSqlQueryPrimitiveNode {
 	type: 'primitive';
 
-	table: string;
+	tableIndex: number;
 	column: string;
 }

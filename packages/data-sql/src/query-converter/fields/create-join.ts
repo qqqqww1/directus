@@ -6,9 +6,9 @@ import type {
 } from '../../types/index.js';
 
 export const createJoin = (
-	currentCollection: string,
 	relationalField: AbstractQueryFieldNodeNestedRelationalMany,
-	externalCollectionAlias: string,
+	tableIndex: number,
+	tableIndexRelational: number,
 ): AbstractSqlQueryJoinNode => {
 	let on: AbstractSqlQueryLogicalNode | AbstractSqlQueryConditionNode;
 
@@ -24,14 +24,14 @@ export const createJoin = (
 					throw new Error(`Missing related foreign key join column for current context column "${currentField}"`);
 				}
 
-				return getJoinCondition(currentCollection, currentField, externalCollectionAlias, externalField);
+				return getJoinCondition(tableIndex, currentField, tableIndexRelational, externalField);
 			}) as AtLeastOneElement<AbstractSqlQueryConditionNode>,
 		};
 	} else {
 		on = getJoinCondition(
-			currentCollection,
+			tableIndex,
 			relationalField.local.fields[0],
-			externalCollectionAlias,
+			tableIndexRelational,
 			relationalField.foreign.fields[0],
 		);
 	}
@@ -39,7 +39,7 @@ export const createJoin = (
 	const result: AbstractSqlQueryJoinNode = {
 		type: 'join',
 		table: relationalField.foreign.collection,
-		as: externalCollectionAlias,
+		tableIndex: tableIndexRelational,
 		on,
 	};
 
@@ -47,9 +47,9 @@ export const createJoin = (
 };
 
 function getJoinCondition(
-	table1: string,
+	tableIndex1: number,
 	column1: string,
-	table2: string,
+	tableIndex2: number,
 	column2: string,
 ): AbstractSqlQueryConditionNode {
 	return {
@@ -59,13 +59,13 @@ function getJoinCondition(
 			type: 'condition-field',
 			target: {
 				type: 'primitive',
-				table: table1,
+				tableIndex: tableIndex1,
 				column: column1,
 			},
 			operation: 'eq',
 			compareTo: {
 				type: 'primitive',
-				table: table2,
+				tableIndex: tableIndex2,
 				column: column2,
 			},
 		},

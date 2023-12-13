@@ -4,7 +4,7 @@ import type { ValuesNode } from '../../parameterized-statement.js';
 export interface AbstractSqlQueryFnNode {
 	type: 'fn';
 
-	table: string;
+	tableIndex: number;
 	column: string;
 
 	/**

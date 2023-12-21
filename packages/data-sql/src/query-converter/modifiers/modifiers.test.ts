@@ -1,171 +1,237 @@
 import type { AbstractQueryModifiers } from '@directus/data';
 import { randomIdentifier, randomInteger } from '@directus/random';
-import { expect, test, vi } from 'vitest';
-import type { AbstractSqlQueryJoinNode } from '../../index.js';
+import { expect, test } from 'vitest';
 import { createIndexGenerators } from '../../utils/create-index-generators.js';
-import { convertFilter } from './filter/filter.js';
-import type { FilterResult } from './filter/utils.js';
 import { convertModifiers, type ModifierConversionResult } from './modifiers.js';
-import { convertSort, type SortConversionResult } from './sort.js';
-
-vi.mock('./filter/filter.js', (importOriginal) => {
-	const mod = importOriginal();
-	return {
-		...mod,
-		convertFilter: vi.fn(),
-	};
-});
-
-vi.mock('./sort.js', (importOriginal) => {
-	const mod = importOriginal();
-	return {
-		...mod,
-		convertSort: vi.fn(),
-	};
-});
 
 test('Convert primitive filter', () => {
-	const sample = {
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
+	const columnValue = randomInteger(1, 100);
+
+	const modifiers: AbstractQueryModifiers = {
 		filter: {
 			type: 'condition',
+
 			condition: {
-				/**... */
+				type: 'condition-number',
+
+				operation: 'eq',
+				target: {
+					type: 'primitive',
+					field: column,
+				},
+				compareTo: columnValue,
 			},
 		},
-	} as AbstractQueryModifiers;
+	};
 
-	const filterConversionMock: FilterResult = {
+	const expectedResult: ModifierConversionResult = {
 		clauses: {
 			where: {
 				type: 'condition',
 				negate: false,
 				condition: {
 					type: 'condition-number',
-					operation: 'lt',
+					operation: 'eq',
 					target: {
 						type: 'primitive',
-						column: randomIdentifier(),
-						table: randomIdentifier(),
+						tableIndex,
+						column,
 					},
-					compareTo: { type: 'value', parameterIndex: 0 },
+					compareTo: {
+						type: 'value',
+						parameterIndex: 0,
+					},
 				},
 			},
-			joins: [],
 		},
-		parameters: [randomInteger(0, 100)],
+		parameters: [columnValue],
 	};
-
-	vi.mocked(convertFilter).mockReturnValueOnce(filterConversionMock);
-	const randomCollection = randomIdentifier();
 
 	const indexGen = createIndexGenerators();
-	const res = convertModifiers(sample, randomCollection, indexGen);
+	const result = convertModifiers(modifiers, tableIndex, indexGen);
 
-	const expected: ModifierConversionResult = {
-		clauses: {
-			where: filterConversionMock.clauses.where,
-		},
-		parameters: filterConversionMock.parameters,
-	};
-
-	expect(res).toStrictEqual(expected);
+	expect(result).toStrictEqual(expectedResult);
 });
 
 test('Convert nested, primitive filter', () => {
-	const compareTo = randomInteger(0, 100);
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
 
-	const sample = {
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalColumn = randomIdentifier();
+	const externalColumnValue = randomInteger(1, 100);
+	const externalKeyColumn = randomIdentifier();
+
+	const modifiers: AbstractQueryModifiers = {
 		filter: {
 			type: 'condition',
+
 			condition: {
-				/**... */
+				type: 'condition-number',
+
+				operation: 'eq',
+				target: {
+					type: 'nested-one-target',
+					field: {
+						type: 'primitive',
+						field: externalColumn,
+					},
+					nesting: {
+						type: 'relational-many',
+						local: {
+							fields: [column],
+						},
+						foreign: {
+							store: externalStore,
+							collection: externalTable,
+							fields: [externalKeyColumn],
+						},
+					},
+				},
+				compareTo: externalColumnValue,
 			},
 		},
-	} as AbstractQueryModifiers;
+	};
 
-	const filterConversionMock: FilterResult = {
+	const expectedResult: ModifierConversionResult = {
 		clauses: {
 			where: {
 				type: 'condition',
 				negate: false,
 				condition: {
 					type: 'condition-number',
-					operation: 'lt',
+					operation: 'eq',
 					target: {
 						type: 'primitive',
-						column: randomIdentifier(),
-						table: randomIdentifier(),
+						tableIndex: externalTableIndex,
+						column: externalColumn,
 					},
-					compareTo: { type: 'value', parameterIndex: 0 },
+					compareTo: {
+						type: 'value',
+						parameterIndex: 0,
+					},
 				},
 			},
-			// in case of nested filter, a join clause is returned as well from the filter module
 			joins: [
 				{
 					type: 'join',
-					/*... */
-				} as AbstractSqlQueryJoinNode,
+					table: externalTable,
+					tableIndex: externalTableIndex,
+					on: {
+						type: 'condition',
+						negate: false,
+						condition: {
+							type: 'condition-field',
+							target: {
+								type: 'primitive',
+								tableIndex,
+								column: column,
+							},
+							operation: 'eq',
+							compareTo: {
+								type: 'primitive',
+								tableIndex: externalTableIndex,
+								column: externalKeyColumn,
+							},
+						},
+					},
+				},
 			],
 		},
-		parameters: [compareTo],
+		parameters: [externalColumnValue],
 	};
-
-	vi.mocked(convertFilter).mockReturnValueOnce(filterConversionMock);
-	const randomCollection = randomIdentifier();
 
 	const indexGen = createIndexGenerators();
-	const res = convertModifiers(sample, randomCollection, indexGen);
+	const result = convertModifiers(modifiers, tableIndex, indexGen);
 
-	const expected: ModifierConversionResult = {
-		clauses: {
-			joins: filterConversionMock.clauses.joins,
-			where: filterConversionMock.clauses.where,
-		},
-		parameters: filterConversionMock.parameters,
-	};
-
-	expect(res).toStrictEqual(expected);
+	expect(result).toStrictEqual(expectedResult);
 });
 
-test('Convert nested sort', () => {
-	const sampleModifiers = { sort: {} } as AbstractQueryModifiers;
+test.only('Convert nested sort', () => {
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
 
-	const sortConversionMock: SortConversionResult = {
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalColumn = randomIdentifier();
+	const externalKeyColumn = randomIdentifier();
+
+	const modifiers: AbstractQueryModifiers = {
+		sort: [
+			{
+				type: 'sort',
+				direction: 'ascending',
+				target: {
+					type: 'nested-one-target',
+					field: {
+						type: 'primitive',
+						field: externalColumn,
+					},
+					nesting: {
+						type: 'relational-many',
+						local: {
+							fields: [column],
+						},
+						foreign: {
+							store: externalStore,
+							collection: externalTable,
+							fields: [externalKeyColumn],
+						},
+					},
+				},
+			},
+		],
+	};
+
+	const expectedResult: ModifierConversionResult = {
 		clauses: {
 			order: [
 				{
 					type: 'order',
-					direction: 'ASC',
 					orderBy: {
 						type: 'primitive',
-						column: randomIdentifier(),
-						table: randomIdentifier(),
+						tableIndex: externalTableIndex,
+						column: externalColumn,
 					},
+					direction: 'ASC',
 				},
 			],
-			// in case of nested filter, a join clause is returned as well from the filter module
 			joins: [
 				{
 					type: 'join',
-					/*... */
-				} as AbstractSqlQueryJoinNode,
+					table: externalTable,
+					tableIndex: externalTableIndex,
+					on: {
+						type: 'condition',
+						negate: false,
+						condition: {
+							type: 'condition-field',
+							target: {
+								type: 'primitive',
+								tableIndex,
+								column,
+							},
+							operation: 'eq',
+							compareTo: {
+								type: 'primitive',
+								tableIndex: externalTableIndex,
+								column: externalKeyColumn,
+							},
+						},
+					},
+				},
 			],
-		},
-	};
-
-	vi.mocked(convertSort).mockReturnValueOnce(sortConversionMock);
-	const randomCollection = randomIdentifier();
-
-	const indexGen = createIndexGenerators();
-	const res = convertModifiers(sampleModifiers, randomCollection, indexGen);
-
-	const expected: ModifierConversionResult = {
-		clauses: {
-			joins: sortConversionMock.clauses.joins,
-			order: sortConversionMock.clauses.order,
 		},
 		parameters: [],
 	};
 
-	expect(res).toStrictEqual(expected);
+	const indexGen = createIndexGenerators();
+	const result = convertModifiers(modifiers, tableIndex, indexGen);
+
+	expect(result).toStrictEqual(expectedResult);
 });

@@ -1,66 +1,61 @@
 import type { AbstractQueryFieldNodeNestedSingleMany } from '@directus/data';
-import { randomIdentifier, randomInteger } from '@directus/random';
-import { afterAll, expect, test, vi } from 'vitest';
+import { randomAlpha, randomIdentifier, randomInteger, randomUUID } from '@directus/random';
+import { expect, test } from 'vitest';
 import type { ConverterResult } from '../../index.js';
 import { getNestedMany, type NestedManyResult } from './create-nested-manys.js';
 
-afterAll(() => {
-	vi.restoreAllMocks();
-});
-
-vi.mock('../../utils/create-unique-alias.js', () => ({
-	createUniqueAlias: vi.fn().mockImplementation((i) => `${i}_RANDOM`),
-}));
-
 test('getNestedMany with a single identifier', () => {
-	const collection = randomIdentifier();
-	const localIdField = randomIdentifier();
-	const foreignIdField = randomIdentifier();
-	const foreignIdFieldAlias = randomIdentifier();
-	const foreignTable = randomIdentifier();
-	const foreignStore = randomIdentifier();
-	const randomValue = randomIdentifier();
-	const manyAlias = randomIdentifier();
+	const columnIndexToName = (columnIndex: number) => `c${columnIndex}`;
+
+	const tableIndex = randomInteger(0, 100);
+	const keyColumn = randomIdentifier();
+	const keyColumnIndex = 1;
+	const keyColumnValue = randomUUID();
+
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalForeignKeyColumn = randomIdentifier();
+	const externalForeignKeyColumnIndex = 0;
+	const externalForeignKeyColumnAlias = randomIdentifier();
 
 	const field: AbstractQueryFieldNodeNestedSingleMany = {
 		type: 'nested-single-many',
 		fields: [
 			{
 				type: 'primitive',
-				field: foreignIdField,
-				alias: foreignIdFieldAlias,
+				field: externalForeignKeyColumn,
+				alias: externalForeignKeyColumnAlias,
 			},
 		],
 		nesting: {
 			type: 'relational-many',
 			local: {
-				fields: [localIdField],
+				fields: [keyColumn],
 			},
 			foreign: {
-				store: foreignStore,
-				collection: foreignTable,
-				fields: [foreignIdField],
+				store: externalStore,
+				collection: externalTable,
+				fields: [externalForeignKeyColumn],
 			},
 		},
-		alias: manyAlias,
+		alias: randomIdentifier(),
 		modifiers: {},
 	};
 
-	const result = getNestedMany(collection, field);
-
-	const expected: NestedManyResult = {
+	const expectedResult: NestedManyResult = {
 		subQuery: expect.any(Function),
 		select: [
 			{
 				type: 'primitive',
-				table: collection,
-				column: localIdField,
-				as: `${localIdField}_RANDOM`,
+				tableIndex,
+				column: keyColumn,
+				columnIndex: keyColumnIndex,
 			},
 		],
 	};
 
-	const rootRow = { [`${localIdField}_RANDOM`]: randomValue };
+	const rootRow = { [columnIndexToName(keyColumnIndex)]: keyColumnValue };
 
 	const expectedGeneratedQuery: ConverterResult = {
 		rootQuery: {
@@ -68,12 +63,15 @@ test('getNestedMany with a single identifier', () => {
 				select: [
 					{
 						type: 'primitive',
-						table: foreignTable,
-						column: foreignIdField,
-						as: `${foreignIdField}_RANDOM`,
+						tableIndex: externalTableIndex,
+						column: externalForeignKeyColumn,
+						columnIndex: externalForeignKeyColumnIndex,
 					},
 				],
-				from: foreignTable,
+				from: {
+					table: externalTable,
+					tableIndex: externalTableIndex,
+				},
 				joins: [],
 				where: {
 					type: 'condition',
@@ -82,8 +80,8 @@ test('getNestedMany with a single identifier', () => {
 						operation: 'eq',
 						target: {
 							type: 'primitive',
-							table: foreignTable,
-							column: foreignIdField,
+							tableIndex: externalTableIndex,
+							column: externalForeignKeyColumn,
 						},
 						compareTo: {
 							type: 'value',
@@ -93,75 +91,84 @@ test('getNestedMany with a single identifier', () => {
 					negate: false,
 				},
 			},
-			parameters: [randomValue],
+			parameters: [keyColumnValue],
 		},
 		subQueries: [],
-		aliasMapping: [{ type: 'root', alias: foreignIdFieldAlias, column: `${foreignIdField}_RANDOM` }],
+		aliasMapping: [{ type: 'root', alias: externalForeignKeyColumnAlias, columnIndex: externalForeignKeyColumnIndex }],
 	};
 
-	expect(result).toStrictEqual(expected);
-	expect(result.subQuery(rootRow)).toStrictEqual(expectedGeneratedQuery);
+	const result = getNestedMany(field, tableIndex);
+
+	expect(result).toStrictEqual(expectedResult);
+	expect(result.subQuery(rootRow, columnIndexToName)).toStrictEqual(expectedGeneratedQuery);
 });
 
 test('getNestedMany with a multiple identifiers (a composite key)', () => {
-	const collection = randomIdentifier();
-	const foreignIdField = randomIdentifier();
-	const foreignIdFieldAlias = randomIdentifier();
-	const randomValue1 = randomIdentifier();
-	const randomValue2 = randomIdentifier();
-	const localIdField1 = randomIdentifier();
-	const localIdField2 = randomIdentifier();
-	const foreignIdField1 = randomIdentifier();
-	const foreignIdField2 = randomIdentifier();
-	const foreignTable = randomIdentifier();
-	const foreignStore = randomIdentifier();
-	const manyAlias = randomIdentifier();
+	const columnIndexToName = (columnIndex: number) => `c${columnIndex}`;
+
+	const tableIndex = randomInteger(0, 100);
+	const keyColumn1 = randomIdentifier();
+	const keyColumn1Index = 1;
+	const keyColumn1Value = randomUUID();
+	const keyColumn2 = randomIdentifier();
+	const keyColumn2Index = 2;
+	const keyColumn2Value = randomUUID();
+
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalColumn = randomIdentifier();
+	const externalColumnIndex = 0;
+	const externalColumnAlias = randomIdentifier();
+	const externalForeignKeyColumn1 = randomIdentifier();
+	const externalForeignKeyColumn2 = randomIdentifier();
 
 	const field: AbstractQueryFieldNodeNestedSingleMany = {
 		type: 'nested-single-many',
 		fields: [
 			{
 				type: 'primitive',
-				field: foreignIdField,
-				alias: foreignIdFieldAlias,
+				field: externalColumn,
+				alias: externalColumnAlias,
 			},
 		],
 		nesting: {
 			type: 'relational-many',
 			local: {
-				fields: [localIdField1, localIdField2],
+				fields: [keyColumn1, keyColumn2],
 			},
 			foreign: {
-				store: foreignStore,
-				collection: foreignTable,
-				fields: [foreignIdField1, foreignIdField2],
+				store: externalStore,
+				collection: externalTable,
+				fields: [externalForeignKeyColumn1, externalForeignKeyColumn2],
 			},
 		},
 		modifiers: {},
-		alias: manyAlias,
+		alias: randomIdentifier(),
 	};
 
-	const result = getNestedMany(collection, field);
-
-	const expected: NestedManyResult = {
+	const expectedResult: NestedManyResult = {
 		subQuery: expect.any(Function),
 		select: [
 			{
 				type: 'primitive',
-				table: collection,
-				column: localIdField1,
-				as: `${localIdField1}_RANDOM`,
+				tableIndex,
+				column: keyColumn1,
+				columnIndex: keyColumn1Index,
 			},
 			{
 				type: 'primitive',
-				table: collection,
-				column: localIdField2,
-				as: `${localIdField2}_RANDOM`,
+				tableIndex,
+				column: keyColumn2,
+				columnIndex: keyColumn2Index,
 			},
 		],
 	};
 
-	const rootRow = { [`${localIdField1}_RANDOM`]: randomValue1, [`${localIdField2}_RANDOM`]: randomValue2 };
+	const rootRow = {
+		[columnIndexToName(keyColumn1Index)]: keyColumn1Value,
+		[columnIndexToName(keyColumn2Index)]: keyColumn2Value,
+	};
 
 	const expectedGeneratedQuery: ConverterResult = {
 		rootQuery: {
@@ -169,12 +176,15 @@ test('getNestedMany with a multiple identifiers (a composite key)', () => {
 				select: [
 					{
 						type: 'primitive',
-						table: foreignTable,
-						column: foreignIdField,
-						as: `${foreignIdField}_RANDOM`,
+						tableIndex: externalTableIndex,
+						column: externalColumn,
+						columnIndex: externalColumnIndex,
 					},
 				],
-				from: foreignTable,
+				from: {
+					table: externalTable,
+					tableIndex: externalTableIndex,
+				},
 				joins: [],
 				where: {
 					type: 'logical',
@@ -188,8 +198,8 @@ test('getNestedMany with a multiple identifiers (a composite key)', () => {
 								operation: 'eq',
 								target: {
 									type: 'primitive',
-									table: foreignTable,
-									column: foreignIdField1,
+									tableIndex: externalTableIndex,
+									column: externalForeignKeyColumn1,
 								},
 								compareTo: {
 									type: 'value',
@@ -205,8 +215,8 @@ test('getNestedMany with a multiple identifiers (a composite key)', () => {
 								operation: 'eq',
 								target: {
 									type: 'primitive',
-									table: foreignTable,
-									column: foreignIdField2,
+									tableIndex: externalTableIndex,
+									column: externalForeignKeyColumn2,
 								},
 								compareTo: {
 									type: 'value',
@@ -218,46 +228,54 @@ test('getNestedMany with a multiple identifiers (a composite key)', () => {
 					],
 				},
 			},
-			parameters: [randomValue1, randomValue2],
+			parameters: [keyColumn1Value, keyColumn2Value],
 		},
 		subQueries: [],
-		aliasMapping: [{ type: 'root', alias: foreignIdFieldAlias, column: `${foreignIdField}_RANDOM` }],
+		aliasMapping: [{ type: 'root', alias: externalColumnAlias, columnIndex: externalColumnIndex }],
 	};
 
-	expect(result).toStrictEqual(expected);
-	expect(result.subQuery(rootRow)).toStrictEqual(expectedGeneratedQuery);
+	const result = getNestedMany(field, tableIndex);
+
+	expect(result).toStrictEqual(expectedResult);
+	expect(result.subQuery(rootRow, columnIndexToName)).toStrictEqual(expectedGeneratedQuery);
 });
 
 test('getNestedMany with modifiers', () => {
-	const localIdField = randomIdentifier();
-	const foreignIdField = randomIdentifier();
-	const foreignIdFieldAlias = randomIdentifier();
-	const foreignTable = randomIdentifier();
-	const foreignStore = randomIdentifier();
-	const randomPkValue = randomIdentifier();
-	const randomCompareValue = randomIdentifier();
-	const randomLimit = randomInteger(1, 100);
-	const manyAlias = randomIdentifier();
-	const collection = randomIdentifier();
+	const columnIndexToName = (columnIndex: number) => `c${columnIndex}`;
+
+	const tableIndex = randomInteger(0, 100);
+	const keyColumn = randomIdentifier();
+	const keyColumnIndex = 1;
+	const keyColumnValue = randomUUID();
+
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalForeignKeyColumn = randomIdentifier();
+	const externalForeignKeyColumnIndex = 0;
+	const externalForeignKeyColumnAlias = randomIdentifier();
+	const externalForeignKeyColumnValue = randomUUID();
+
+	const limit = randomInteger(1, 100);
 
 	const field: AbstractQueryFieldNodeNestedSingleMany = {
 		type: 'nested-single-many',
 		fields: [
 			{
 				type: 'primitive',
-				field: foreignIdField,
-				alias: foreignIdFieldAlias,
+				field: externalForeignKeyColumn,
+				alias: externalForeignKeyColumnAlias,
 			},
 		],
 		nesting: {
 			type: 'relational-many',
 			local: {
-				fields: [localIdField],
+				fields: [keyColumn],
 			},
 			foreign: {
-				store: foreignStore,
-				collection: foreignTable,
-				fields: [foreignIdField],
+				store: externalStore,
+				collection: externalTable,
+				fields: [externalForeignKeyColumn],
 			},
 		},
 		modifiers: {
@@ -268,14 +286,14 @@ test('getNestedMany with modifiers', () => {
 					operation: 'starts_with',
 					target: {
 						type: 'primitive',
-						field: foreignIdField,
+						field: externalForeignKeyColumn,
 					},
-					compareTo: randomCompareValue,
+					compareTo: externalForeignKeyColumnValue,
 				},
 			},
 			limit: {
 				type: 'limit',
-				value: randomLimit,
+				value: limit,
 			},
 			sort: [
 				{
@@ -283,29 +301,30 @@ test('getNestedMany with modifiers', () => {
 					direction: 'ascending',
 					target: {
 						type: 'primitive',
-						field: foreignIdField,
+						field: externalForeignKeyColumn,
 					},
 				},
 			],
 		},
-		alias: manyAlias,
+		alias: randomIdentifier(),
 	};
 
-	const result = getNestedMany(collection, field);
-
-	const expected: NestedManyResult = {
+	const expectedResult: NestedManyResult = {
 		subQuery: expect.any(Function),
 		select: [
 			{
 				type: 'primitive',
-				table: collection,
-				column: localIdField,
-				as: `${localIdField}_RANDOM`,
+				tableIndex,
+				column: keyColumn,
+				columnIndex: keyColumnIndex,
 			},
 		],
 	};
 
-	const rootRow = { [`${localIdField}_RANDOM`]: randomPkValue, [`${foreignIdField}_RANDOM`]: randomCompareValue };
+	const rootRow = {
+		[columnIndexToName(keyColumnIndex)]: keyColumnValue,
+		[columnIndexToName(externalForeignKeyColumnIndex)]: externalForeignKeyColumnValue,
+	};
 
 	const expectedGeneratedQuery: ConverterResult = {
 		rootQuery: {
@@ -313,12 +332,15 @@ test('getNestedMany with modifiers', () => {
 				select: [
 					{
 						type: 'primitive',
-						table: foreignTable,
-						column: foreignIdField,
-						as: `${foreignIdField}_RANDOM`,
+						tableIndex: externalTableIndex,
+						column: externalForeignKeyColumn,
+						columnIndex: externalForeignKeyColumnIndex,
 					},
 				],
-				from: foreignTable,
+				from: {
+					table: externalTable,
+					tableIndex: externalTableIndex,
+				},
 				joins: [],
 				where: {
 					type: 'logical',
@@ -332,8 +354,8 @@ test('getNestedMany with modifiers', () => {
 								operation: 'starts_with',
 								target: {
 									type: 'primitive',
-									table: foreignTable,
-									column: foreignIdField,
+									tableIndex: externalTableIndex,
+									column: externalForeignKeyColumn,
 								},
 								compareTo: {
 									type: 'value',
@@ -349,8 +371,8 @@ test('getNestedMany with modifiers', () => {
 								operation: 'eq',
 								target: {
 									type: 'primitive',
-									table: foreignTable,
-									column: foreignIdField,
+									tableIndex: externalTableIndex,
+									column: externalForeignKeyColumn,
 								},
 								compareTo: {
 									type: 'value',
@@ -370,60 +392,71 @@ test('getNestedMany with modifiers', () => {
 						type: 'order',
 						orderBy: {
 							type: 'primitive',
-							table: foreignTable,
-							column: foreignIdField,
+							tableIndex: externalTableIndex,
+							column: externalForeignKeyColumn,
 						},
 						direction: 'ASC',
 					},
 				],
 			},
 
-			parameters: [randomCompareValue, randomLimit, randomPkValue],
+			parameters: [externalForeignKeyColumnValue, limit, keyColumnValue],
 		},
 		subQueries: [],
-		aliasMapping: [{ type: 'root', alias: foreignIdFieldAlias, column: `${foreignIdField}_RANDOM` }],
+		aliasMapping: [{ type: 'root', alias: externalForeignKeyColumnAlias, columnIndex: externalForeignKeyColumnIndex }],
 	};
 
-	expect(result).toStrictEqual(expected);
-	expect(result.subQuery(rootRow)).toStrictEqual(expectedGeneratedQuery);
+	const result = getNestedMany(field, tableIndex);
+
+	expect(result).toStrictEqual(expectedResult);
+	expect(result.subQuery(rootRow, columnIndexToName)).toStrictEqual(expectedGeneratedQuery);
 });
 
 test('getNestedMany with nested modifiers', () => {
-	const randomJoinCurrentField = randomIdentifier();
-	const randomExternalCollection = randomIdentifier();
-	const randomExternalStore = randomIdentifier();
-	const randomExternalField = randomIdentifier();
-	const randomJoinNodeField = randomIdentifier();
-	const randomJoinNodeFieldAlias = randomIdentifier();
-	const randomNestedAlias = randomIdentifier();
-	const nestedJoinCurrentField = randomIdentifier();
-	const nestedExternalStore = randomIdentifier();
-	const nestedExternalCollection = randomIdentifier();
-	const nestedForeignIdFields = randomIdentifier();
-	const randomLimit = randomInteger(1, 100);
-	const compareValue = randomIdentifier();
-	const nestedTargetField = randomIdentifier();
-	const collection = randomIdentifier();
+	const columnIndexToName = (columnIndex: number) => `c${columnIndex}`;
+
+	const tableIndex = randomInteger(0, 100);
+	const keyColumn = randomIdentifier();
+	const keyColumnIndex = 1;
+	const keyColumnValue = randomUUID();
+
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalColumn = randomIdentifier();
+	const externalColumnIndex = 0;
+	const externalColumnAlias = randomIdentifier();
+	const externalForeignKeyColumn = randomIdentifier();
+	const externalNestedForeignKeyColumn = randomIdentifier();
+
+	const nestedStore = randomIdentifier();
+	const nestedTable = randomIdentifier();
+	const nestedTableIndex = 1;
+	const nestedColumn = randomIdentifier();
+	const nestedColumnValue = randomAlpha(10);
+	const nestedKeyColumn = randomIdentifier();
+
+	const limit = randomInteger(1, 100);
 
 	const field: AbstractQueryFieldNodeNestedSingleMany = {
 		type: 'nested-single-many',
 		fields: [
 			{
 				type: 'primitive',
-				field: randomJoinNodeField,
-				alias: randomJoinNodeFieldAlias,
+				field: externalColumn,
+				alias: externalColumnAlias,
 			},
 		],
-		alias: randomNestedAlias,
+		alias: randomIdentifier(),
 		nesting: {
 			type: 'relational-many',
 			local: {
-				fields: [randomJoinCurrentField],
+				fields: [keyColumn],
 			},
 			foreign: {
-				store: randomExternalStore,
-				collection: randomExternalCollection,
-				fields: [randomExternalField],
+				store: externalStore,
+				collection: externalTable,
+				fields: [externalForeignKeyColumn],
 			},
 		},
 		modifiers: {
@@ -436,46 +469,41 @@ test('getNestedMany with nested modifiers', () => {
 						type: 'nested-one-target',
 						field: {
 							type: 'primitive',
-							field: nestedTargetField,
+							field: nestedColumn,
 						},
 						nesting: {
 							type: 'relational-many',
 							local: {
-								fields: [nestedJoinCurrentField],
+								fields: [externalNestedForeignKeyColumn],
 							},
 							foreign: {
-								store: nestedExternalStore,
-								collection: nestedExternalCollection,
-								fields: [nestedForeignIdFields],
+								store: nestedStore,
+								collection: nestedTable,
+								fields: [nestedKeyColumn],
 							},
 						},
 					},
-					compareTo: compareValue,
+					compareTo: nestedColumnValue,
 				},
 			},
 			limit: {
 				type: 'limit',
-				value: randomLimit,
+				value: limit,
 			},
 		},
 	};
 
-	const result = getNestedMany(collection, field);
-
-	const expected: NestedManyResult = {
+	const expectedResult: NestedManyResult = {
 		subQuery: expect.any(Function),
 		select: [
 			{
 				type: 'primitive',
-				table: collection,
-				column: randomJoinCurrentField,
-				as: `${randomJoinCurrentField}_RANDOM`,
+				tableIndex,
+				column: keyColumn,
+				columnIndex: keyColumnIndex,
 			},
 		],
 	};
-
-	expect(result).toStrictEqual(expected);
-	const randomPkValue = randomIdentifier();
 
 	const expectedGeneratedQuery: ConverterResult = {
 		rootQuery: {
@@ -483,31 +511,34 @@ test('getNestedMany with nested modifiers', () => {
 				select: [
 					{
 						type: 'primitive',
-						table: randomExternalCollection,
-						column: randomJoinNodeField,
-						as: `${randomJoinNodeField}_RANDOM`,
+						tableIndex: externalTableIndex,
+						column: externalColumn,
+						columnIndex: externalColumnIndex,
 					},
 				],
-				from: randomExternalCollection,
+				from: {
+					table: externalTable,
+					tableIndex: externalTableIndex,
+				},
 				joins: [
 					{
 						type: 'join',
-						table: nestedExternalCollection,
-						as: `${nestedExternalCollection}_RANDOM`,
+						table: nestedTable,
+						tableIndex: nestedTableIndex,
 						on: {
 							type: 'condition',
 							condition: {
 								type: 'condition-field',
 								compareTo: {
 									type: 'primitive',
-									column: nestedForeignIdFields,
-									table: `${nestedExternalCollection}_RANDOM`,
+									tableIndex: nestedTableIndex,
+									column: nestedKeyColumn,
 								},
 								operation: 'eq',
 								target: {
 									type: 'primitive',
-									column: nestedJoinCurrentField,
-									table: randomExternalCollection,
+									tableIndex: externalTableIndex,
+									column: externalNestedForeignKeyColumn,
 								},
 							},
 							negate: false,
@@ -526,8 +557,8 @@ test('getNestedMany with nested modifiers', () => {
 								operation: 'starts_with',
 								target: {
 									type: 'primitive',
-									table: `${nestedExternalCollection}_RANDOM`,
-									column: nestedTargetField,
+									tableIndex: nestedTableIndex,
+									column: nestedColumn,
 								},
 								compareTo: {
 									type: 'value',
@@ -543,8 +574,8 @@ test('getNestedMany with nested modifiers', () => {
 								operation: 'eq',
 								target: {
 									type: 'primitive',
-									table: randomExternalCollection,
-									column: randomExternalField,
+									tableIndex: externalTableIndex,
+									column: externalForeignKeyColumn,
 								},
 								compareTo: {
 									type: 'value',
@@ -560,19 +591,22 @@ test('getNestedMany with nested modifiers', () => {
 					parameterIndex: 1,
 				},
 			},
-			parameters: [compareValue, randomLimit, randomPkValue],
+			parameters: [nestedColumnValue, limit, keyColumnValue],
 		},
 		subQueries: [],
 		aliasMapping: [
 			{
 				type: 'root',
-				alias: randomJoinNodeFieldAlias,
-				column: `${randomJoinNodeField}_RANDOM`,
+				alias: externalColumnAlias,
+				columnIndex: externalColumnIndex,
 			},
 		],
 	};
 
-	const rootResultRow = { [`${randomJoinCurrentField}_RANDOM`]: randomPkValue };
+	const rootResultRow = { [columnIndexToName(keyColumnIndex)]: keyColumnValue };
 
-	expect(result.subQuery(rootResultRow)).toStrictEqual(expectedGeneratedQuery);
+	const result = getNestedMany(field, tableIndex);
+
+	expect(result).toStrictEqual(expectedResult);
+	expect(result.subQuery(rootResultRow, columnIndexToName)).toStrictEqual(expectedGeneratedQuery);
 });

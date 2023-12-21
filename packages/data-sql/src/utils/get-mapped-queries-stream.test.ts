@@ -4,6 +4,7 @@ import type { AliasMapping, SubQuery } from '../index.js';
 import { ReadableStream } from 'node:stream/web';
 import { randomAlpha, randomIdentifier } from '@directus/random';
 import { readToEnd } from './stream-consumer.js';
+import { randomUUID } from 'crypto';
 
 function getStreamMock(data: Record<string, unknown>[]): ReadableStream<Record<string, unknown>> {
 	return new ReadableStream({
@@ -15,32 +16,36 @@ function getStreamMock(data: Record<string, unknown>[]): ReadableStream<Record<s
 }
 
 test('nested-many', async () => {
-	//@todo randomize the values
-	const localPkField = randomIdentifier();
-	const pkFieldValue1 = randomAlpha(50);
-	const pkFieldValue2 = randomAlpha(50);
+	const columnIndexToName = (columnIndex: number) => `c${columnIndex}`;
 
-	const desiredLocalField = randomIdentifier();
-	const desiredLocalFieldValue1 = randomIdentifier();
-	const desiredLocalFieldValue2 = randomIdentifier();
+	//@todo randomize the values
+	const keyColumn = randomIdentifier();
+	const keyColumnIndex = 0;
+	const keyColumnValue1 = randomUUID();
+	const keyColumnValue2 = randomUUID();
+	const column = randomIdentifier();
+	const columnIndex = 1;
+	const columnValue1 = randomAlpha(10);
+	const columnValue2 = randomAlpha(10);
+
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalColumn = randomIdentifier();
+	const externalColumnIndex = 0;
+	const externalColumnValue1 = randomAlpha(10);
+	const externalColumnValue2 = randomAlpha(10);
+	const foreignFieldValue3 = randomAlpha(10);
 
 	const rootStream = getStreamMock([
 		{
-			[localPkField]: pkFieldValue1,
-			[desiredLocalField]: desiredLocalFieldValue1,
+			[columnIndexToName(keyColumnIndex)]: keyColumnValue1,
+			[columnIndexToName(columnIndex)]: columnValue1,
 		},
 		{
-			[localPkField]: pkFieldValue2,
-			[desiredLocalField]: desiredLocalFieldValue2,
+			[columnIndexToName(keyColumnIndex)]: keyColumnValue2,
+			[columnIndexToName(columnIndex)]: columnValue2,
 		},
 	]);
-
-	// foreign table specs
-	const foreignTable = randomIdentifier();
-
-	// foreign fields
-	const foreignField = randomIdentifier();
-	const foreignFieldId = randomIdentifier();
 
 	const subQuery: SubQuery = () => {
 		return {
@@ -49,37 +54,35 @@ test('nested-many', async () => {
 					select: [
 						{
 							type: 'primitive',
-							table: foreignTable,
-							column: foreignField,
-							as: foreignFieldId,
+							tableIndex: externalTableIndex,
+							column: externalColumn,
+							columnIndex: externalColumnIndex,
 						},
 					],
-					from: foreignTable,
+					from: {
+						table: externalTable,
+						tableIndex: externalTableIndex,
+					},
 				},
 				parameters: [],
 			},
 			subQueries: [],
-			aliasMapping: [{ type: 'root', alias: foreignField, column: foreignFieldId }],
+			aliasMapping: [{ type: 'root', alias: externalColumn, columnIndex: externalColumnIndex }],
 		};
 	};
 
-	// database response mocks
-	const foreignFieldValue1 = randomIdentifier();
-	const foreignFieldValue2 = randomIdentifier();
-	const foreignFieldValue3 = randomIdentifier();
-
 	const firstDatabaseResponse = [
 		{
-			[foreignFieldId]: foreignFieldValue1,
+			[columnIndexToName(externalColumnIndex)]: externalColumnValue1,
 		},
 		{
-			[foreignFieldId]: foreignFieldValue2,
+			[columnIndexToName(externalColumnIndex)]: externalColumnValue2,
 		},
 	];
 
 	const secondDatabaseResponse = [
 		{
-			[foreignFieldId]: foreignFieldValue3,
+			[columnIndexToName(externalColumnIndex)]: foreignFieldValue3,
 		},
 	];
 
@@ -89,33 +92,40 @@ test('nested-many', async () => {
 		.mockResolvedValueOnce(getStreamMock(secondDatabaseResponse));
 
 	const aliasMapping: AliasMapping = [
-		{ type: 'root', alias: localPkField, column: localPkField },
-		{ type: 'root', alias: desiredLocalField, column: desiredLocalField },
-		{ type: 'sub', alias: foreignTable, index: 0 },
+		{ type: 'root', alias: keyColumn, columnIndex: keyColumnIndex },
+		{ type: 'root', alias: column, columnIndex: columnIndex },
+		{ type: 'sub', alias: externalTable, index: 0 },
 	];
 
-	const resultingStream = getMappedQueriesStream(rootStream, [subQuery], aliasMapping, queryDataBaseMockFn);
+	const resultingStream = getMappedQueriesStream(
+		rootStream,
+		[subQuery],
+		aliasMapping,
+		columnIndexToName,
+		queryDataBaseMockFn,
+	);
+
 	const actualResult = await readToEnd(resultingStream);
 
 	const expectedResult = [
 		{
-			[localPkField]: pkFieldValue1,
-			[desiredLocalField]: desiredLocalFieldValue1,
-			[foreignTable]: [
+			[keyColumn]: keyColumnValue1,
+			[column]: columnValue1,
+			[externalTable]: [
 				{
-					[foreignField]: foreignFieldValue1,
+					[externalColumn]: externalColumnValue1,
 				},
 				{
-					[foreignField]: foreignFieldValue2,
+					[externalColumn]: externalColumnValue2,
 				},
 			],
 		},
 		{
-			[localPkField]: pkFieldValue2,
-			[desiredLocalField]: desiredLocalFieldValue2,
-			[foreignTable]: [
+			[keyColumn]: keyColumnValue2,
+			[column]: columnValue2,
+			[externalTable]: [
 				{
-					[foreignField]: foreignFieldValue3,
+					[externalColumn]: foreignFieldValue3,
 				},
 			],
 		},

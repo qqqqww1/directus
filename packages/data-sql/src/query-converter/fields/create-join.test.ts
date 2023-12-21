@@ -1,81 +1,86 @@
 import type { AbstractQueryFieldNodeNestedRelationalMany } from '@directus/data';
-import { randomIdentifier } from '@directus/random';
+import { randomIdentifier, randomInteger } from '@directus/random';
 import { expect, test } from 'vitest';
 import type { AbstractSqlQueryJoinNode } from '../../types/index.js';
 import { createJoin } from './create-join.js';
 
 test('Convert m2o relation on single field ', () => {
-	const randomCurrentCollection = randomIdentifier();
-	const randomCurrentField = randomIdentifier();
-	const randomExternalCollection = randomIdentifier();
-	const randomExternalStore = randomIdentifier();
-	const randomExternalField = randomIdentifier();
-	const randomAlias = randomIdentifier();
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
 
-	const node: AbstractQueryFieldNodeNestedRelationalMany = {
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = randomInteger(0, 100);
+	const externalColumn = randomIdentifier();
+
+	const relationalField: AbstractQueryFieldNodeNestedRelationalMany = {
 		type: 'relational-many',
 		local: {
-			fields: [randomCurrentField],
+			fields: [column],
 		},
 		foreign: {
-			store: randomExternalStore,
-			collection: randomExternalCollection,
-			fields: [randomExternalField],
+			store: externalStore,
+			collection: externalTable,
+			fields: [externalColumn],
 		},
 	};
 
-	const expected: AbstractSqlQueryJoinNode = {
+	const expectedResult: AbstractSqlQueryJoinNode = {
 		type: 'join',
-		table: randomExternalCollection,
+		table: externalTable,
+		tableIndex: externalTableIndex,
 		on: {
 			type: 'condition',
 			condition: {
 				type: 'condition-field',
 				target: {
 					type: 'primitive',
-					table: randomCurrentCollection,
-					column: randomCurrentField,
+					tableIndex: tableIndex,
+					column: column,
 				},
 				operation: 'eq',
 				compareTo: {
 					type: 'primitive',
-					table: randomAlias,
-					column: randomExternalField,
+					tableIndex: externalTableIndex,
+					column: externalColumn,
 				},
 			},
 			negate: false,
 		},
-		as: randomAlias,
 	};
 
-	expect(createJoin(randomCurrentCollection, node, randomAlias)).toStrictEqual(expected);
+	const result = createJoin(relationalField, tableIndex, externalTableIndex);
+
+	expect(result).toStrictEqual(expectedResult);
 });
 
 test('Convert m2o relation with composite keys', () => {
-	const randomCurrentCollection = randomIdentifier();
-	const randomCurrentField = randomIdentifier();
-	const randomCurrentField2 = randomIdentifier();
-	const randomExternalCollection = randomIdentifier();
-	const randomExternalStore = randomIdentifier();
-	const randomExternalField = randomIdentifier();
-	const randomExternalField2 = randomIdentifier();
-	const randomGeneratedAlias = randomIdentifier();
+	const tableIndex = randomInteger(0, 100);
+	const column1 = randomIdentifier();
+	const column2 = randomIdentifier();
 
-	const node: AbstractQueryFieldNodeNestedRelationalMany = {
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = randomInteger(0, 100);
+	const externalColumn1 = randomIdentifier();
+	const externalColumn2 = randomIdentifier();
+
+	const relationalField: AbstractQueryFieldNodeNestedRelationalMany = {
 		type: 'relational-many',
 		local: {
-			fields: [randomCurrentField, randomCurrentField2],
+			fields: [column1, column2],
 		},
 		foreign: {
-			store: randomExternalStore,
-			collection: randomExternalCollection,
-			fields: [randomExternalField, randomExternalField2],
+			store: externalStore,
+			collection: externalTable,
+			fields: [externalColumn1, externalColumn2],
 		},
 	};
 
-	const expected: AbstractSqlQueryJoinNode = {
+	const expectedResult: AbstractSqlQueryJoinNode = {
 		type: 'join',
-		table: randomExternalCollection,
+		table: externalTable,
+		tableIndex: externalTableIndex,
 		on: {
 			type: 'logical',
 			operator: 'and',
@@ -87,14 +92,14 @@ test('Convert m2o relation with composite keys', () => {
 						type: 'condition-field',
 						target: {
 							type: 'primitive',
-							table: randomCurrentCollection,
-							column: randomCurrentField,
+							tableIndex: tableIndex,
+							column: column1,
 						},
 						operation: 'eq',
 						compareTo: {
 							type: 'primitive',
-							table: randomGeneratedAlias,
-							column: randomExternalField,
+							tableIndex: externalTableIndex,
+							column: externalColumn1,
 						},
 					},
 					negate: false,
@@ -105,22 +110,23 @@ test('Convert m2o relation with composite keys', () => {
 						type: 'condition-field',
 						target: {
 							type: 'primitive',
-							table: randomCurrentCollection,
-							column: randomCurrentField2,
+							tableIndex: tableIndex,
+							column: column2,
 						},
 						operation: 'eq',
 						compareTo: {
 							type: 'primitive',
-							table: randomGeneratedAlias,
-							column: randomExternalField2,
+							tableIndex: externalTableIndex,
+							column: externalColumn2,
 						},
 					},
 					negate: false,
 				},
 			],
 		},
-		as: randomGeneratedAlias,
 	};
 
-	expect(createJoin(randomCurrentCollection, node, randomGeneratedAlias)).toStrictEqual(expected);
+	const result = createJoin(relationalField, tableIndex, externalTableIndex);
+
+	expect(result).toStrictEqual(expectedResult);
 });

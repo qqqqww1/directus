@@ -1,230 +1,219 @@
 import type { AbstractQueryNodeSort, AtLeastOneElement } from '@directus/data';
-import { randomIdentifier } from '@directus/random';
-import { beforeEach, expect, test, vi } from 'vitest';
-import type { AbstractSqlQuerySelectPrimitiveNode } from '../../index.js';
+import { randomIdentifier, randomInteger } from '@directus/random';
+import { expect, test } from 'vitest';
 import { createIndexGenerators } from '../../utils/create-index-generators.js';
 import { convertSort, type SortConversionResult } from './sort.js';
-import { convertTarget, type TargetConversionResult } from './target.js';
 
-vi.mock('./target.js', (importOriginal) => {
-	const original = importOriginal();
-	return {
-		...original,
-		convertTarget: vi.fn(),
-	};
-});
+test('convert ascending sort with a single field', () => {
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
 
-let sample: AtLeastOneElement<AbstractQueryNodeSort>;
-const localCollection = randomIdentifier();
-const targetField = randomIdentifier();
-
-beforeEach(() => {
-	sample = [
+	const sorts: AtLeastOneElement<AbstractQueryNodeSort> = [
 		{
 			type: 'sort',
 			direction: 'ascending',
 			target: {
 				type: 'primitive',
-				field: targetField,
+				field: column,
 			},
 		},
 	];
-});
 
-test('convert ascending sort with a single field', () => {
-	const mock: TargetConversionResult = {
-		value: {
-			type: 'primitive',
-			table: localCollection,
-			column: targetField,
-		},
-		joins: [],
-	};
-
-	vi.mocked(convertTarget).mockReturnValueOnce(mock);
-
-	const indexGen = createIndexGenerators();
-	const res = convertSort(sample, localCollection, indexGen);
-
-	const expected: SortConversionResult = {
+	const expectedResult: SortConversionResult = {
 		clauses: {
 			joins: [],
 			order: [
 				{
 					type: 'order',
-					orderBy: mock.value as AbstractSqlQuerySelectPrimitiveNode,
+					orderBy: {
+						type: 'primitive',
+						tableIndex,
+						column,
+					},
 					direction: 'ASC',
 				},
 			],
 		},
 	};
 
-	expect(res).toStrictEqual(expected);
+	const indexGen = createIndexGenerators();
+	const result = convertSort(sorts, tableIndex, indexGen);
+
+	expect(result).toStrictEqual(expectedResult);
 });
 
 test('convert descending sort with a single field', () => {
-	sample[0]!.direction = 'descending';
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
 
-	const mock: TargetConversionResult = {
-		value: {
-			type: 'primitive',
-			table: randomIdentifier(),
-			column: randomIdentifier(),
+	const sorts: AtLeastOneElement<AbstractQueryNodeSort> = [
+		{
+			type: 'sort',
+			direction: 'descending',
+			target: {
+				type: 'primitive',
+				field: column,
+			},
 		},
-		joins: [],
-	};
+	];
 
-	vi.mocked(convertTarget).mockReturnValueOnce(mock);
-
-	const indexGen = createIndexGenerators();
-	const res = convertSort(sample, localCollection, indexGen);
-
-	const expected: SortConversionResult = {
+	const expectedResult: SortConversionResult = {
 		clauses: {
 			joins: [],
 			order: [
 				{
 					type: 'order',
-					orderBy: mock.value as AbstractSqlQuerySelectPrimitiveNode,
+					orderBy: {
+						type: 'primitive',
+						tableIndex,
+						column,
+					},
 					direction: 'DESC',
 				},
 			],
 		},
 	};
 
-	expect(res).toStrictEqual(expected);
+	const indexGen = createIndexGenerators();
+	const result = convertSort(sorts, tableIndex, indexGen);
+
+	expect(result).toStrictEqual(expectedResult);
 });
 
 test('convert ascending sort with multiple fields', () => {
-	sample.push({
-		type: 'sort',
-		direction: 'ascending',
-		target: {
-			type: 'primitive',
-			field: randomIdentifier(),
+	const tableIndex = randomInteger(0, 100);
+	const column1 = randomIdentifier();
+	const column2 = randomIdentifier();
+
+	const sorts: AtLeastOneElement<AbstractQueryNodeSort> = [
+		{
+			type: 'sort',
+			direction: 'ascending',
+			target: {
+				type: 'primitive',
+				field: column1,
+			},
 		},
-	});
-
-	const mock1: TargetConversionResult = {
-		value: {
-			type: 'primitive',
-			table: randomIdentifier(),
-			column: randomIdentifier(),
+		{
+			type: 'sort',
+			direction: 'descending',
+			target: {
+				type: 'primitive',
+				field: column2,
+			},
 		},
-		joins: [],
-	};
+	];
 
-	vi.mocked(convertTarget).mockReturnValueOnce(mock1);
-
-	const mock2: TargetConversionResult = {
-		value: {
-			type: 'primitive',
-			table: randomIdentifier(),
-			column: randomIdentifier(),
-		},
-		joins: [],
-	};
-
-	vi.mocked(convertTarget).mockReturnValueOnce(mock2);
-
-	const indexGen = createIndexGenerators();
-	const res = convertSort(sample, localCollection, indexGen);
-
-	const expected: SortConversionResult = {
+	const expectedResult: SortConversionResult = {
 		clauses: {
 			joins: [],
 			order: [
 				{
 					type: 'order',
-					orderBy: mock1.value as AbstractSqlQuerySelectPrimitiveNode,
+					orderBy: {
+						type: 'primitive',
+						tableIndex,
+						column: column1,
+					},
 					direction: 'ASC',
 				},
 				{
 					type: 'order',
-					orderBy: mock2.value as AbstractSqlQuerySelectPrimitiveNode,
-					direction: 'ASC',
+					orderBy: {
+						type: 'primitive',
+						tableIndex,
+						column: column2,
+					},
+					direction: 'DESC',
 				},
 			],
 		},
 	};
 
-	expect(res).toStrictEqual(expected);
+	const indexGen = createIndexGenerators();
+	const result = convertSort(sorts, tableIndex, indexGen);
+
+	expect(result).toStrictEqual(expectedResult);
 });
 
 test('convert sort on nested item', () => {
-	const nestedSortSample: AbstractQueryNodeSort = {
-		type: 'sort',
-		direction: 'ascending',
-		target: {
-			type: 'nested-one-target',
-			field: {
-				type: 'primitive',
-				field: randomIdentifier(),
-			},
-			nesting: {
-				type: 'relational-many',
-				local: {
-					fields: [randomIdentifier()],
-				},
-				foreign: {
-					store: randomIdentifier(),
-					collection: randomIdentifier(),
-					fields: [randomIdentifier()],
-				},
-			},
-		},
-	};
+	const tableIndex = randomInteger(0, 100);
+	const column = randomIdentifier();
 
-	const mock: TargetConversionResult = {
-		value: {
-			type: 'primitive',
-			table: randomIdentifier(),
-			column: randomIdentifier(),
-		},
-		joins: [
-			{
-				type: 'join',
-				table: randomIdentifier(),
-				as: randomIdentifier(),
-				on: {
-					type: 'condition',
-					negate: false,
-					condition: {
-						type: 'condition-field',
-						target: {
-							type: 'primitive',
-							table: randomIdentifier(),
-							column: randomIdentifier(),
-						},
-						operation: 'eq',
-						compareTo: {
-							type: 'primitive',
-							table: randomIdentifier(),
-							column: randomIdentifier(),
-						},
+	const externalStore = randomIdentifier();
+	const externalTable = randomIdentifier();
+	const externalTableIndex = 0;
+	const externalColumn = randomIdentifier();
+	const externalKeyColumn = randomIdentifier();
+
+	const sorts: AtLeastOneElement<AbstractQueryNodeSort> = [
+		{
+			type: 'sort',
+			direction: 'ascending',
+			target: {
+				type: 'nested-one-target',
+				field: {
+					type: 'primitive',
+					field: externalColumn,
+				},
+				nesting: {
+					type: 'relational-many',
+					local: {
+						fields: [column],
+					},
+					foreign: {
+						store: externalStore,
+						collection: externalTable,
+						fields: [externalKeyColumn],
 					},
 				},
 			},
-		],
-	};
+		},
+	];
 
-	vi.mocked(convertTarget).mockReturnValueOnce(mock);
-
-	const indexGen = createIndexGenerators();
-	const res = convertSort([nestedSortSample], localCollection, indexGen);
-
-	const expected: SortConversionResult = {
+	const expectedResult: SortConversionResult = {
 		clauses: {
-			joins: mock.joins,
+			joins: [
+				{
+					type: 'join',
+					table: externalTable,
+					tableIndex: externalTableIndex,
+					on: {
+						type: 'condition',
+						negate: false,
+						condition: {
+							type: 'condition-field',
+							target: {
+								type: 'primitive',
+								tableIndex,
+								column,
+							},
+							operation: 'eq',
+							compareTo: {
+								type: 'primitive',
+								tableIndex: externalTableIndex,
+								column: externalKeyColumn,
+							},
+						},
+					},
+				},
+			],
 			order: [
 				{
 					type: 'order',
-					orderBy: mock.value as AbstractSqlQuerySelectPrimitiveNode,
+					orderBy: {
+						type: 'primitive',
+						tableIndex: externalTableIndex,
+						column: externalColumn,
+					},
 					direction: 'ASC',
 				},
 			],
 		},
 	};
 
-	expect(res).toStrictEqual(expected);
+	const indexGen = createIndexGenerators();
+	const result = convertSort(sorts, tableIndex, indexGen);
+
+	expect(result).toStrictEqual(expectedResult);
 });

@@ -293,7 +293,7 @@ export const usePresetsStore = defineStore({
 				});
 			}
 
-			if (preset.user !== userID) {
+			if (preset.user !== userID && preset.user !== null) {
 				if ('id' in preset) delete preset.id;
 
 				return await this.create({

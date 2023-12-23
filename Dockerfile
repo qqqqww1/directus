@@ -3,7 +3,7 @@
 ####################################################################################################
 ## Build Packages
 
-FROM node:18-alpine AS builder
+FROM node:18 AS builder
 WORKDIR /directus
 
 ARG TARGETPLATFORM
@@ -17,9 +17,8 @@ RUN <<EOF
   fi
 EOF
 
-COPY package.json .
-RUN corepack enable && corepack prepare
-
+# pnpm 切换淘宝源
+RUN pnpm config set registry https://registry.npm.taobao.org
 COPY pnpm-lock.yaml .
 RUN pnpm fetch
 

@@ -17,6 +17,9 @@ RUN <<EOF
   fi
 EOF
 
+# node镜像安装 pnpm
+RUN npm install --global pnpm@6
+
 # pnpm 切换淘宝源
 RUN pnpm config set registry https://registry.npm.taobao.org
 COPY pnpm-lock.yaml .

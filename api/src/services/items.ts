@@ -13,6 +13,7 @@ import { ForbiddenError } from '@directus/errors';
 import { translateDatabaseError } from '../database/errors/translate.js';
 import { InvalidPayloadError } from '@directus/errors';
 import type {
+	AST,
 	AbstractService,
 	AbstractServiceOptions,
 	ActionEventParams,
@@ -428,6 +429,48 @@ export class ItemsService<Item extends AnyItem = AnyItem> implements AbstractSer
 			});
 
 			ast = await authorizationService.processAST(ast, opts?.permissionsAction);
+		}
+
+		const orArr = (ast.query?.filter as any)?.['_or'] ?? [];
+
+		if (this.collection === 'account' && this.accountability?.admin !== true) {
+			const userAccountAst = {
+				type: 'root',
+				name: 'user_account',
+				children: [
+					{
+						type: 'field',
+						name: 'account',
+						fieldKey: 'account',
+					},
+				],
+				query: {
+					filter: {
+						user: {
+							_eq: this.accountability?.user ?? '',
+						},
+					},
+				},
+			} as AST;
+
+			const match_accounts = (
+				await runAST(userAccountAst, this.schema, {
+					knex: this.knex,
+					// GraphQL requires relational keys to be returned regardless
+					stripNonRequested: opts?.stripNonRequested !== undefined ? opts.stripNonRequested : true,
+				})
+			)?.map((i: any) => i.account) as string[];
+
+			orArr.push(
+				...match_accounts.map((account) => ({
+					username: { _eq: account },
+				})),
+			);
+
+			ast.query.filter = {
+				...ast.query.filter,
+				_or: orArr,
+			};
 		}
 
 		const records = await runAST(ast, this.schema, {

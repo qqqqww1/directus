@@ -18,7 +18,7 @@ RUN <<EOF
 EOF
 
 # node镜像安装 pnpm
-RUN npm install --global pnpm@6
+RUN npm install --global pnpm@8
 
 # pnpm 切换淘宝源
 RUN pnpm config set registry https://registry.npm.taobao.org
@@ -26,25 +26,21 @@ COPY pnpm-lock.yaml .
 RUN pnpm fetch
 
 COPY . .
-RUN <<EOF
-	pnpm install --recursive --offline --frozen-lockfile
-	npm_config_workspace_concurrency=1 pnpm run build
-	pnpm --filter directus deploy --prod dist
-	cd dist
+RUN pnpm install --recursive --offline --frozen-lockfile && \
+	npm_config_workspace_concurrency=1 pnpm run build && \
+	pnpm --filter directus deploy --prod dist && \
+	cd dist && \
 	# Regenerate package.json file with essential fields only
 	# (see https://github.com/directus/directus/issues/20338)
-	node -e '
-		const f = "package.json", {name, version, type, exports, bin} = require(`./${f}`), {packageManager} = require(`../${f}`);
-		fs.writeFileSync(f, JSON.stringify({name, version, type, exports, bin, packageManager}, null, 2));
-	'
+	node -e ' const f = "package.json", {name, version, type, exports, bin} = require(`./${f}`), {packageManager} = require(`../${f}`); fs.writeFileSync(f, JSON.stringify({name, version, type, exports, bin, packageManager}, null, 2));' && \
 	mkdir -p database extensions uploads
-EOF
+
 
 ####################################################################################################
 ## Create Production Image
 
-FROM node:18-alpine AS runtime
-
+FROM node:18 AS runtime
+RUN npm config set registry https://registry.npm.taobao.org
 RUN npm install --global pm2@5
 
 USER node
